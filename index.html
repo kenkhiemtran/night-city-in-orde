@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Night City, In Order</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--era:#d7ff3a;--ink:#e9edf2;--dim:#8e98a8;--bg:#05060a;--glass:rgba(6,8,13,.78)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Barlow,system-ui,sans-serif;overflow:hidden}
+canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+canvas#gl:active{cursor:grabbing}
+.scan{position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 1px,transparent 1px 3px);mix-blend-mode:overlay}
+.vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 60% 45%,transparent 45%,rgba(0,0,0,.7) 100%)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--era);outline-offset:2px}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase}
+
+header{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;padding:18px 22px;pointer-events:none;z-index:3}
+header>*{pointer-events:auto}
+.brand{font-family:"Chakra Petch",sans-serif;font-weight:700;font-size:15px;letter-spacing:.22em;text-transform:uppercase}
+.brand small{display:block;font:400 10.5px "JetBrains Mono",monospace;letter-spacing:.14em;color:var(--dim);margin-top:4px}
+.tools{display:flex;gap:8px}
+.chip{font:700 10.5px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;padding:8px 11px;border:1px solid rgba(255,255,255,.22);background:var(--glass);backdrop-filter:blur(6px)}
+.chip:hover{border-color:var(--era);color:var(--era)}
+.chip[aria-pressed=true]{background:var(--era);color:#05060a;border-color:var(--era)}
+
+.panel{position:fixed;left:22px;bottom:104px;width:min(430px,calc(100vw - 44px));z-index:3;background:var(--glass);backdrop-filter:blur(10px);border-left:3px solid var(--era);padding:20px 22px 16px;clip-path:polygon(0 0,calc(100% - 22px) 0,100% 22px,100% 100%,0 100%);transition:border-color .5s}
+.panel .era{font-size:10.5px;color:var(--era);display:flex;justify-content:space-between;gap:12px;transition:color .5s}
+.panel .era span:last-child{color:var(--dim)}
+.panel h2{font-family:"Chakra Petch",sans-serif;font-weight:700;font-size:clamp(22px,2.6vw,30px);line-height:1.08;margin:12px 0 10px;text-wrap:balance}
+.panel .body{font-size:15.5px;line-height:1.55;color:#cfd5de;margin:0;transition:filter .3s}
+.panel .note{font-size:12.5px;line-height:1.45;color:var(--dim);margin:10px 0 0;padding-top:9px;border-top:1px dashed rgba(255,255,255,.16)}
+.panel .note:empty{display:none}
+.nav{display:flex;align-items:center;gap:10px;margin-top:16px}
+.nav button{font:700 11px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;padding:10px 14px;border:1px solid rgba(255,255,255,.25)}
+.nav button:hover:not(:disabled){border-color:var(--era);color:var(--era)}
+.nav button:disabled{opacity:.3;cursor:default}
+.nav .next{background:var(--era);color:#05060a;border-color:var(--era);transition:background .5s}
+.nav .next:hover:not(:disabled){color:#05060a;filter:brightness(1.15)}
+.nav .count{margin-left:auto;font:400 11px "JetBrains Mono",monospace;color:var(--dim)}
+.cast{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;align-items:center}
+.cast:empty{display:none}
+.cast .lbl{font:400 10px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-right:2px}
+.cast button{display:flex;align-items:center;gap:7px;padding:4px 10px 4px 5px;border:1px solid rgba(255,255,255,.2);font-size:13px;font-weight:500}
+.cast button:hover,.cast button[aria-expanded=true]{border-color:var(--era);color:var(--era)}
+.cast button[aria-expanded=true]{background:rgba(255,255,255,.06)}
+canvas.px{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+.cast canvas{width:22px;height:22px}
+.who{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;margin-top:10px;padding:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12)}
+.who[hidden]{display:none}
+.who canvas{width:66px;height:66px;background:rgba(0,0,0,.45);padding:0}
+.who .wn{font-family:"Chakra Petch",sans-serif;font-weight:700;font-size:17px;line-height:1.1}
+.who .wr{font:700 10px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--era);margin:4px 0 6px}
+.who p{margin:0;font-size:13.5px;line-height:1.45;color:#cfd5de}
+.who a{display:inline-block;margin-top:9px;font:700 10.5px "JetBrains Mono",monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--era);text-decoration:none;border-bottom:1px solid currentColor;padding-bottom:2px}
+.who a:hover{color:#fff}
+.who .wc{font-size:11px;color:var(--dim);margin-top:6px;line-height:1.4}
+.veil{display:none;margin-top:10px}
+body.s2hide .panel.s2 .body,body.s2hide .panel.s2 .note,body.s2hide .panel.s2 h2,body.s2hide .panel.s2 .cast,body.s2hide .panel.s2 .who{filter:blur(9px);user-select:none;pointer-events:none}
+body.s2hide .panel.s2 .veil{display:inline-block}
+
+.rail{position:fixed;left:22px;right:22px;bottom:20px;z-index:3;display:flex;gap:14px;align-items:flex-end}
+.grp{display:flex;flex-direction:column;gap:7px;min-width:0}
+.grp .lbl{font:700 9.5px "JetBrains Mono",monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--c);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grp .lbl i{font-style:normal;color:var(--dim);font-weight:400;margin-left:6px}
+.ticks{display:flex;gap:4px}
+.ticks button{flex:1;height:26px;min-width:8px;padding:0;position:relative}
+.ticks button::before{content:"";position:absolute;left:0;right:0;bottom:8px;height:4px;background:var(--c);opacity:.3;transition:all .25s}
+.ticks button:hover::before{opacity:.75;height:8px}
+.ticks button.seen::before{opacity:.6}
+.ticks button.on::before{opacity:1;height:14px;bottom:6px;box-shadow:0 0 14px var(--c)}
+
+.hint{position:fixed;right:22px;bottom:104px;z-index:2;font:400 10.5px "JetBrains Mono",monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);text-align:right;line-height:1.9;pointer-events:none}
+.hint b{color:var(--ink);font-weight:700}
+
+.intro{position:fixed;inset:0;z-index:10;display:grid;place-items:center;background:rgba(3,4,7,.84);backdrop-filter:blur(5px);padding:22px;overflow:auto;transition:opacity .6s}
+.intro.gone{opacity:0;pointer-events:none}
+.card{max-width:620px;width:100%}
+.card .k{font-size:11px;color:var(--dim)}
+.card h1{font-family:"Chakra Petch",sans-serif;font-weight:700;font-size:clamp(38px,7.2vw,76px);line-height:.92;margin:14px 0 18px;letter-spacing:-.01em;text-transform:uppercase}
+.card h1 em{font-style:normal;color:#d7ff3a}
+.card p{font-size:16.5px;line-height:1.55;color:#cfd5de;margin:0 0 20px;max-width:54ch}
+.legend{list-style:none;padding:0;margin:0 0 22px;border-top:1px solid rgba(255,255,255,.14)}
+.legend li{display:grid;grid-template-columns:14px 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.14);font-size:15px}
+.legend li::before{content:"";width:10px;height:10px;background:var(--c);box-shadow:0 0 10px var(--c)}
+.legend span{font:400 11px "JetBrains Mono",monospace;color:var(--dim);letter-spacing:.08em}
+.opt{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:#cfd5de;margin-bottom:22px;line-height:1.4}
+.opt input{accent-color:#d7ff3a;width:17px;height:17px;margin:1px 0 0;flex:none}
+.go{font:700 13px "JetBrains Mono",monospace;letter-spacing:.16em;text-transform:uppercase;background:#d7ff3a;color:#05060a;padding:16px 26px;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,0 100%)}
+.go:hover{filter:brightness(1.12)}
+.card .fine{font-size:11.5px;color:#6f7888;margin:22px 0 0;line-height:1.5}
+
+@media (max-width:820px){
+  header{padding:12px 14px}
+  .brand small,.hint{display:none}
+  .panel{left:10px;bottom:74px;width:calc(100vw - 20px);padding:14px 16px 12px;max-height:52vh;overflow:auto}
+  .panel .body{font-size:14.5px}
+  .rail{left:10px;right:10px;bottom:10px;gap:6px}
+  .grp .lbl i{display:none}
+  .grp .lbl{font-size:8.5px}
+  .ticks{gap:2px}
+  .vig{background:radial-gradient(ellipse at 50% 30%,transparent 40%,rgba(0,0,0,.7) 100%)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body class="">
+<canvas id="gl" aria-hidden="true"></canvas>
+<div class="vig"></div><div class="scan"></div>
+
+<header>
+  <div class="brand">Night City, In Order<small>2023 → 2078 · full spoilers</small></div>
+  <div class="tools">
+    <button class="chip" id="tour" aria-pressed="false">Auto tour</button>
+    <button class="chip" id="s2btn" aria-pressed="false" hidden>Season 2 hidden</button>
+  </div>
+</header>
+
+<section class="panel" id="panel" aria-live="polite">
+  <div class="era mono"><span id="pEra"></span><span id="pYear"></span></div>
+  <h2 id="pTitle"></h2>
+  <p class="body" id="pBody"></p>
+  <p class="note" id="pNote"></p>
+  <div class="cast" id="cast"></div>
+  <div class="who" id="who" hidden><canvas class="px" id="whoIc" width="13" height="13"></canvas><div><div class="wn" id="whoN"></div><div class="wr" id="whoR"></div><p id="whoT"></p><a id="whoL" target="_blank" rel="noopener"></a><div class="wc" id="whoC"></div></div></div>
+  <button class="chip veil" id="reveal">Reveal Edgerunners 2 spoilers</button>
+  <div class="nav">
+    <button id="prev">← Back</button>
+    <button id="next" class="next">Next →</button>
+    <span class="count" id="pCount"></span>
+  </div>
+</section>
+
+<div class="hint"><b>Scroll</b> / <b>← →</b> travel<br><b>Drag</b> look around</div>
+<nav class="rail" id="rail" aria-label="Timeline"></nav>
+
+<div class="intro" id="intro">
+  <div class="card">
+    <div class="k mono">An unofficial walk-through timeline</div>
+    <h1>Night City,<br><em>in order</em></h1>
+    <p>One road through the city, twenty-one stops. The first anime season, the game and its expansion, then the second season, arranged by when they happen rather than when they were released.</p>
+    <ul class="legend" id="legend"></ul>
+    <label class="opt"><input type="checkbox" id="s2chk"><span>Blur the Edgerunners 2 chapters until I choose to reveal them (it only came out on October 20, 2026).</span></label>
+    <button class="go" id="go">Enter the city</button>
+    <p class="fine">Everything here is spoilers. Fan-made summary in original words; Cyberpunk 2077 and Cyberpunk: Edgerunners are the property of CD PROJEKT RED. No official art or footage is used.</p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+/* ---------- story data ---------- */
+const ERAS=[
+ {id:"pro",name:"Prologue",span:"2023",src:"Told in the game's flashbacks",c:"#ff3d6e",fog:"#14060d"},
+ {id:"s1",name:"Edgerunners",span:"2075–2076",src:"Anime, season one",c:"#d7ff3a",fog:"#0b0e05"},
+ {id:"game",name:"Cyberpunk 2077",span:"2077",src:"The game",c:"#19e6ff",fog:"#04101a"},
+ {id:"pl",name:"Phantom Liberty",span:"2077",src:"The game's expansion",c:"#ff7a2b",fog:"#160905"},
+ {id:"s2",name:"Edgerunners 2",span:"c. 2078",src:"Anime, season two",c:"#b98cff",fog:"#0c0718"}
+];
+const CH=[
+ {e:"pro",y:"2023",k:"tower",t:"The night the tower fell",
+  b:"Rock star and anti-corporate firebrand Johnny Silverhand joins a raid on Arasaka Tower, and a nuclear device levels the heart of Night City. Arasaka takes him alive just long enough to run Soulkiller on him, a program that copies a mind and destroys the brain it came from. His copy sits in a corporate vault for the next fifty years.",
+  n:"We only ever see this through Johnny's own memories, and he is not a reliable narrator."},
+
+ {e:"s1",y:"2075",k:"blocks",t:"A scholarship kid from Santo Domingo",
+  b:"David Martinez is a poor teenager attending the elite Arasaka Academy, paid for by his mother Gloria's endless shifts as a paramedic. He is gifted, out of place, and bullied by classmates who were born into the corporate world he is supposed to be climbing toward."},
+ {e:"s1",y:"2075",k:"spine",t:"The Sandevistan",
+  b:"A gang shootout on the freeway wrecks their car, and Gloria dies afterward because they cannot pay for real care. Among her things David finds a military-grade Sandevistan, a spinal implant that lets its user move faster than the eye can follow. With nothing left to lose, he has a back-alley ripperdoc install it."},
+ {e:"s1",y:"2075",k:"moon",t:"Lucy and the crew",
+  b:"On the train he crosses paths with Lucy, a netrunner lifting data from commuters, who dreams of leaving for the moon. She brings him to Maine, whose mercenary crew was the implant's intended buyer. David works off the debt, finds a family among them, and falls for Lucy."},
+ {e:"s1",y:"2076",k:"shatter",t:"Maine goes over the edge",
+  b:"The work gets bloodier. Pilar is killed by a cyberpsycho in the street. Maine, loaded with more chrome than a mind can carry, breaks down in the middle of a job against an Arasaka man, and neither he nor his partner Dorio makes it out. David inherits the crew, and Maine's arms."},
+ {e:"s1",y:"2076",k:"knot",t:"More chrome, less David",
+  b:"David keeps upgrading, sure that he is built differently. Arasaka agrees: they want him as a test pilot for an experimental Cyberskeleton. Lucy, who escaped Arasaka as a child, secretly kills the netrunners tracking him to keep that hidden. Then the fixer Faraday sells the crew out, Kiwi turns on them, and Lucy is taken."},
+ {e:"s1",y:"2076",k:"frame",t:"The Cyberskeleton",
+  b:"David straps into the Cyberskeleton and tears his way up Arasaka Tower to reach Lucy, his mind coming apart as he goes. Rebecca dies at the top. Adam Smasher, Arasaka's full-body cyborg enforcer, kills David once Lucy is safely away with their driver, Falco. She makes the trip to the moon by herself.",
+  n:"A year later a drink at the Afterlife bar carries David's name. That is how Night City remembers its dead."},
+
+ {e:"game",y:"2077",k:"tri",t:"V",
+  b:"V is a mercenary whose past you choose: a nomad from the Badlands, a street kid from Heywood, or a burned Arasaka corpo. Whatever the origin, V lands in Night City alongside Jackie Welles, a big-hearted merc with the same hunger to become a legend."},
+ {e:"game",y:"2077",k:"chip",t:"The heist",
+  b:"Fixer Dexter DeShawn hires them to steal a prototype biochip, the Relic, from Yorinobu Arasaka's penthouse. They end up hiding in the room as Yorinobu strangles his own father, Saburo, the emperor of the company. Jackie bleeds out during the escape. V slots the chip to keep it safe, and Dex puts a bullet in V's head."},
+ {e:"game",y:"2077",k:"ghost",t:"A ghost in your head",
+  b:"V wakes up in a landfill. The Relic repaired the damage, but it holds Johnny Silverhand's stored mind and is steadily overwriting V with him. V has weeks left. Johnny, furious and fifty years out of date, now appears beside V wherever they go."},
+ {e:"game",y:"2077",k:"compass",t:"Chasing a cure",
+  b:"Every lead needs someone. Judy helps trace the woman who set up the heist. Panam and her nomad clan help capture the Relic's designer. Takemura, Saburo's disgraced bodyguard, wants V as a witness. The Voodoo Boys open a line to Alt Cunningham, Johnny's long-dead lover, now an AI beyond the Blackwall. Along the way V and Johnny stop being enemies."},
+
+ {e:"pl",y:"2077",k:"dome",t:"Dogtown",
+  b:"A netrunner named Songbird breaks into V's head with an offer: help her, and she can cure the Relic. Moments later the president's shuttle is shot down over Dogtown, a walled-off district run by a warlord. V drags President Myers out of the wreck and is paired with Solomon Reed, a federal agent who has been waiting years to be called back in.",
+  n:"Optional, and set in the middle of the main story."},
+ {e:"pl",y:"2077",k:"fork",t:"Songbird or Reed",
+  b:"Songbird has been reaching past the Blackwall for her government and it is killing her. The cure she promised can save only one person, and she meant it for herself. V has to choose between helping her run and helping Reed bring her in, and each path ends with someone betrayed.",
+  n:"Handing her back to the government opens a new ending for V."},
+
+ {e:"game",y:"2077",k:"roof",t:"The rooftop",
+  b:"Arasaka's heir Hanako offers a deal, and V's body gives out before answering. On a rooftop above the city, with Johnny at their shoulder, V decides who to trust for the last run at Mikoshi, the vault where Arasaka keeps its captured minds: Arasaka itself, Panam's clan, Johnny and his old partner Rogue, or no one."},
+ {e:"game",y:"2077",k:"cards",t:"How it ends",
+  b:"There is no single ending. V can ride out of the city with the nomads, or stay and become the legend of the Afterlife with one last job in orbit. Johnny can keep the body and quietly leave town while V passes beyond the Blackwall. Arasaka can file V away. Or, through Phantom Liberty, V takes the surgery, wakes two years later cured, unable to fight, and finds that everyone has moved on.",
+  n:"When V keeps the body, it comes with about six months to live. On several routes V also kills Adam Smasher."},
+
+ {e:"s2",y:"c. 2078",k:"lens",t:"A city after V",
+  b:"Arasaka is still reeling from the blows it took. David Martinez is now a story people tell, half legend and half warning. Roman Carax, a young film obsessive, walks Night City with a camera hunting for true stories, and the people he records are the people this season follows.",
+  n:"The show never states a year. Its references to V, Johnny and a wounded Arasaka put it after the game."},
+ {e:"s2",y:"c. 2078",k:"crown",t:"The King without a crown",
+  b:"Weak Kingsley used to be an edgerunner called King. A cyberpsychotic break on an Arasaka job cost him his crew and his chrome, and Roman caught the collapse on film. Any serious implant could set him off again. Then Avida, a woman he once loved, asks him to bring back her runaway daughter."},
+ {e:"s2",y:"c. 2078",k:"twin",t:"D and Capricorn",
+  b:"D is a netrunner from the Snake Nation nomads, hunting the Arasaka man who ordered his clan wiped out. The trail leads him to Capricorn, a secret Arasaka AI that needs a human host, and to Kyoko, the scientist who built it. His real name turns out to be David. His target, it turns out, died back in 2076 in the chaos of Maine's last job."},
+ {e:"s2",y:"c. 2078",k:"helix",t:"Talia",
+  b:"Talia Yang grew up corporate, the daughter of Kang Tao executive Kiril. She has a degenerative illness, and she answers it by running to the Maelstrom gang and replacing more and more of herself with chrome. Capricorn ends up split in two, half bound to D and half inside Talia. Then Avida is killed."},
+ {e:"s2",y:"c. 2078",k:"burst",t:"Rampage",
+  b:"Grieving and enraged at her father, Talia lets her half of Capricorn take the wheel and tears across Night City after him. D only wants to make the AI whole again. Kang Tao lures her out to the Badlands and calls in missiles on its own mess. Kyoko answers with a massive EMP. Kiril and Kyoko both die there. Weak takes bullets meant to finish him and survives because of the urn holding Avida's ashes."},
+ {e:"s2",y:"c. 2078",k:"star",t:"A light in the sky",
+  b:"D pulls the second shard from Talia, reunites Capricorn inside himself, breaks the first corporate wave and rises toward a light overhead. The show cuts away without saying what becomes of him. Talia, stripped of her chrome, heads to a rehab clinic with Weak, who says he wants to live. Roman runs off with his camera to film whatever comes next.",
+  n:"Unlike the first season, most of this crew walks away."}
+];
+const N=CH.length, eraOf=id=>ERAS.find(e=>e.id===id);
+
+/* ---------- characters: text cards + role emblems (no likenesses) ---------- */
+const ICON={
+ rocker:["....######.","....######.","....#....#.","....#....#.","....#....#.","....#....#.",".####..###.","#####.####.","#####.####.",".###...##..","*.........."],
+ solo:[".....#.....",".....#.....","...#####...","..#.....#..","..#.....#..","###..*..###","..#.....#..","..#.....#..","...#####...",".....#.....",".....#....."],
+ netrunner:["###########","#.........#","#.o.......#","#..o......#","#.o..**...#","#.........#","#.........#","###########","....###....","..#######..","..........."],
+ tech:["....###....",".#..###..#.",".#########.","..###.###..","###..*..###","###.***.###","###..*..###","..###.###..",".#########.",".#..###..#.","....###...."],
+ nomad:["...#####...","..#..#..#..",".#...#...#.","#.#..#..#.#","#..#.#.#..#","#####*#####","#..#.#.#..#","#.#..#..#.#",".#...#...#.","..#..#..#..","...#####..."],
+ fixer:["...#####...","..#######..",".###.o.###.",".##.ooo.##.",".##.o...##.",".##.ooo.##.",".##...o.##.",".##.ooo.##.",".###.o.###.","..#######..","...#####..*"],
+ corpo:[".....#.....",".....#.....","....###....","....#*#....","...#####...","...#o#o#...","...#####...","..##o#*##..","..#######..",".###o#o###.","###########"],
+ medic:["...........","....###....","....###....","....###....",".#########.",".####*####.",".#########.","....###....","....###....","....###....","..........."],
+ media:["...........","..###......","###########","#.........#","#...ooo..*#","#..o...o..#","#..o...o..#","#..o...o..#","#...ooo...#","###########","..........."],
+ ai:[".....#.....","....#.#....","...#...#...","..#..*..#..",".#..*o*..#.","#..*ooo*..#",".#..*o*..#.","..#..*..#..","...#...#...","....#.#....",".....#....."],
+ kin:["...........","..##...##..",".####.####.","###########","#####*#####","###########",".#########.","..#######..","...#####...","....###....",".....#....."]
+};
+const PEOPLE={
+ johnny:["Johnny Silverhand","rocker","Rockerboy","Frontman of the band Samurai and a veteran who made war on Arasaka his whole identity. Charismatic, selfish, and by 2077 a stored copy of a man who has been dead for half a century."],
+ david:["David Martinez","solo","Edgerunner","A sharp kid from Santo Domingo who believes he can carry more chrome than anyone. He wants to live the dreams of the people he loves, and rarely asks what he wants for himself."],
+ gloria:["Gloria Martinez","medic","Paramedic","David's mother. She works herself ragged to keep him in the academy, and quietly sells salvaged cyberware to edgerunners to cover the bills."],
+ lucy:["Lucy","netrunner","Netrunner","Raised and trained as a child inside an Arasaka program, she escaped and has been running since. Guarded, brilliant in the Net, and fixed on getting to the moon."],
+ maine:["Maine","solo","Crew leader","A huge, generous ex-military merc who runs his crew like a family and treats David like a son. His implants are steadily costing him his mind."],
+ dorio:["Dorio","solo","Solo","Maine's partner and second-in-command. The steady one, who can see what is happening to him and stays anyway."],
+ pilar:["Pilar","tech","Techie","The crew's loudmouth tech with custom hands. Rebecca's older brother."],
+ rebecca:["Rebecca","solo","Solo","Small, loud and gleefully trigger-happy. Fiercely loyal to David long after the rest of the crew has thinned out."],
+ kiwi:["Kiwi","netrunner","Netrunner","The crew's veteran netrunner and Lucy's mentor. Her rule is to trust no one, and in the end she follows it."],
+ falco:["Falco","nomad","Driver","The crew's getaway driver. Calm behind the wheel, and one of very few who make it out."],
+ faraday:["Faraday","fixer","Fixer","The fixer who feeds the crew its corporate jobs. He works for whichever megacorp is offering him the better future."],
+ smasher:["Adam Smasher","solo","Arasaka enforcer","Almost entirely machine and contemptuous of anything still human. Arasaka's ultimate weapon across three eras: he is there in 2023, kills David in 2076, and stands between V and Mikoshi in 2077."],
+ v:["V","solo","Mercenary","The player character. V's background, voice and choices are yours, but the constant is a merc who came to Night City to matter and ends up fighting just to stay themselves."],
+ jackie:["Jackie Welles","solo","Mercenary","V's best friend, a Heywood native with a big laugh and bigger plans. He wants his name on a drink at the Afterlife."],
+ dex:["Dexter DeShawn","fixer","Fixer","A legendary fixer back in town after lying low, offering V and Jackie the job that should make their names."],
+ yorinobu:["Yorinobu Arasaka","corpo","Arasaka heir","Saburo's rebellious son, who once ran with a street gang to spite his father and still wants to tear the company down from the inside."],
+ saburo:["Saburo Arasaka","corpo","Arasaka patriarch","Well over a century old and still the absolute ruler of his corporation. The Relic exists because he does not intend to die."],
+ judy:["Judy Alvarez","tech","Braindance techie","A gifted braindance editor working with the Mox. She helps V prepare for the heist, then asks for help when it costs her someone close."],
+ panam:["Panam Palmer","nomad","Nomad","A hot-headed member of the Aldecaldos clan, at odds with her own family when V meets her. One of the most loyal friends V can make."],
+ takemura:["Goro Takemura","solo","Bodyguard","Saburo's personal bodyguard, cast out after the murder. Rigidly honourable, and certain that Arasaka can still be set right."],
+ alt:["Alt Cunningham","ai","AI beyond the Blackwall","The netrunner who wrote Soulkiller and its first victim. What remains of her is a vast intelligence in the old Net that no longer thinks of itself as human."],
+ rogue:["Rogue","fixer","Queen of the Afterlife","Night City's top fixer and Johnny's former partner. She survived by becoming practical about everything he was reckless about."],
+ hanako:["Hanako Arasaka","corpo","Arasaka heir","Saburo's devoted daughter, who wants her brother removed and her father's will carried out."],
+ songbird:["Songbird","netrunner","Federal netrunner","Song So Mi, the government's most valuable netrunner and the president's right hand. Years of reaching past the Blackwall are killing her."],
+ reed:["Solomon Reed","solo","Sleeper agent","A federal agent abandoned by his own agency and left waiting in Night City. He trained Songbird, and still believes in duty more than in the people giving the orders."],
+ myers:["Rosalind Myers","corpo","NUSA President","Former Militech CEO turned president of the New United States. Capable in a firefight and ruthless in everything else."],
+ hansen:["Kurt Hansen","solo","Warlord of Dogtown","An ex-colonel who kept his troops after the war and turned a sealed-off district into his own state."],
+ roman:["Roman Carax","media","Filmmaker","A young cinephile who documents real stories on Night City's streets. Much of the season is seen through what he chooses to film."],
+ weak:["Weak Kingsley","solo","Former edgerunner","Once the celebrated merc known as King. After a cyberpsychotic break he lives with almost no chrome, in the shadow of who he used to be."],
+ avida:["Avida Yang","kin","Talia's mother","Weak's former lover, married into a corporate family. She is the one who pulls him back into the work."],
+ d:["D","netrunner","Snake Nation netrunner","A deadly nomad netrunner and the last of his clan. Revenge is the only plan he has, and it pushes away the few friends he has left."],
+ capricorn:["Capricorn","ai","Arasaka AI","Called Capri. A secret, unstable intelligence able to break into nearly anything, which can only exist through a compatible human host."],
+ kyoko:["Kyoko","tech","Arasaka scientist","The researcher behind the Capricorn project, who understands better than anyone what it will do if it gets loose."],
+ talia:["Talia Yang","solo","Maelstrom runaway","Raised corporate and fiercely independent. Facing a degenerative illness, she chases ever more extreme cyberware with the Maelstrom gang."],
+ kiril:["Kiril Yang","corpo","Kang Tao executive","Talia's father on paper, and a man who sees the Capricorn AI as his company's prize."]
+};
+const CAST=[["johnny"],["david","gloria"],["david","gloria"],["lucy","maine","david"],["maine","dorio","pilar"],["david","lucy","faraday","kiwi"],["david","lucy","rebecca","falco","smasher"],
+ ["v","jackie"],["dex","jackie","yorinobu","saburo"],["v","johnny"],["judy","panam","takemura","alt"],["songbird","myers","reed","hansen"],["songbird","reed"],["hanako","panam","rogue","johnny"],["v","johnny","smasher"],
+ ["roman"],["weak","avida","roman"],["d","capricorn","kyoko"],["talia","kiril","avida"],["talia","d","kyoko","kiril","weak"],["d","capricorn","talia","weak","roman"]];
+const OFFICIAL={
+ s1:["https://www.cyberpunk.net/en/edgerunners","Official Edgerunners site","Character art © CD PROJEKT RED, animated by Studio TRIGGER."],
+ game:["https://www.cyberpunk.net/cyberpunk-2077","Official Cyberpunk 2077 site","Character art © CD PROJEKT RED."],
+ s2:["https://www.cyberpunk.net/edgerunners2","Official Edgerunners 2 site","Character art © CD PROJEKT RED, animated by Studio TRIGGER."]
+};
+const S1=new Set(["david","gloria","lucy","maine","dorio","pilar","rebecca","kiwi","falco","faraday"]);
+const S2=new Set(["roman","weak","avida","d","capricorn","kyoko","talia","kiril"]);
+const srcOf=id=>OFFICIAL[S1.has(id)?"s1":S2.has(id)?"s2":"game"];
+let pxFrame=0, openWho=null;
+function drawIcon(cv,key,color,bob){
+  const x=cv.getContext("2d"),m=ICON[key];x.clearRect(0,0,13,13);
+  const oy=1+(bob&&pxFrame?1:0)-(bob?1:0)+ (bob?1:0);
+  for(let r=0;r<11;r++)for(let c=0;c<11;c++){const ch=m[r][c];if(ch===".")continue;
+    if(ch==="#"){x.globalAlpha=1;x.fillStyle=color}
+    else if(ch==="o"){x.globalAlpha=1;x.fillStyle="#fff"}
+    else{x.globalAlpha=pxFrame?.25:1;x.fillStyle=pxFrame?color:"#fff"}
+    x.fillRect(c+1,r+(bob&&pxFrame?0:1),1,1)}
+  x.globalAlpha=1;
+}
+function paintIcons(){const col=eraOf(CH[idx].e).c;document.querySelectorAll("canvas.px").forEach(cv=>{if(cv.dataset.ic)drawIcon(cv,cv.dataset.ic,col,cv.id==="whoIc")})}
+function showWho(id){
+  openWho=openWho===id?null:id;
+  document.querySelectorAll("#cast button").forEach(b=>b.setAttribute("aria-expanded",b.dataset.id===openWho));
+  const w=$("who"); if(!openWho){w.hidden=true;return}
+  const P=PEOPLE[openWho]; $("whoN").textContent=P[0]; $("whoR").textContent=P[2]; $("whoT").textContent=P[3];
+  const o=srcOf(openWho); $("whoL").href=o[0]; $("whoL").textContent="See official art ↗"; $("whoL").title=o[1]; $("whoC").textContent=o[2];
+  $("whoIc").dataset.ic=P[1]; w.hidden=false; paintIcons();
+}
+function renderCast(){
+  openWho=null; $("who").hidden=true;
+  $("cast").innerHTML='<span class="lbl">Who\'s here</span>'+CAST[idx].map(id=>`<button data-id="${id}" aria-expanded="false" title="${PEOPLE[id][2]}"><canvas class="px" width="13" height="13" data-ic="${PEOPLE[id][1]}"></canvas>${PEOPLE[id][0]}</button>`).join("");
+  document.querySelectorAll("#cast button").forEach(b=>b.onclick=()=>showWho(b.dataset.id));
+  paintIcons();
+}
+if(!matchMedia("(prefers-reduced-motion:reduce)").matches) setInterval(()=>{pxFrame^=1;paintIcons()},480);
+
+
+/* ---------- DOM ---------- */
+const $=id=>document.getElementById(id);
+const reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
+let idx=0, seen=new Set([0]), p=0, touring=false, tourT=0, started=false;
+
+$("legend").innerHTML=ERAS.map(e=>`<li style="--c:${e.c}"><div>${e.name} <span>· ${e.src}</span></div><span>${e.span}</span></li>`).join("");
+// timeline rail: consecutive chapters of the same era form a group
+(function(){
+  let html="",i=0;
+  while(i<N){
+    const e=eraOf(CH[i].e); let j=i; while(j<N&&CH[j].e===CH[i].e) j++;
+    html+=`<div class="grp" style="--c:${e.c};flex:${j-i}"><div class="lbl">${e.name}<i>${e.span}</i></div><div class="ticks">`;
+    for(let k=i;k<j;k++) html+=`<button data-i="${k}" aria-label="${k+1}. ${CH[k].t}" title="${CH[k].t}"></button>`;
+    html+="</div></div>"; i=j;
+  }
+  $("rail").innerHTML=html;
+})();
+const ticks=[...document.querySelectorAll(".ticks button")];
+ticks.forEach(b=>b.onclick=()=>go(+b.dataset.i,true));
+
+function render(){
+  const c=CH[idx], e=eraOf(c.e);
+  document.documentElement.style.setProperty("--era",e.c);
+  $("pEra").textContent=e.name+" · "+e.src; $("pYear").textContent=c.y;
+  $("pTitle").textContent=c.t; $("pBody").textContent=c.b; $("pNote").textContent=c.n||"";
+  $("pCount").textContent=String(idx+1).padStart(2,"0")+" / "+N;
+  $("panel").classList.toggle("s2",c.e==="s2");
+  $("prev").disabled=idx===0; $("next").disabled=idx===N-1;
+  ticks.forEach((b,i)=>{b.classList.toggle("on",i===idx);b.classList.toggle("seen",seen.has(i))});
+  renderCast();
+}
+function go(i,manual){
+  i=Math.max(0,Math.min(N-1,i)); if(i===idx) return;
+  idx=i; seen.add(i); look.yaw*=.2; look.pitch*=.2; tourT=0;
+  if(manual&&touring) setTour(false);
+  if(reduce) p=idx;
+  render();
+}
+function setTour(on){touring=on;tourT=0;$("tour").setAttribute("aria-pressed",on);$("tour").textContent=on?"Stop tour":"Auto tour"}
+function setHide(on){document.body.classList.toggle("s2hide",on);$("s2btn").hidden=!on&&!$("s2btn").dataset.used;$("s2btn").dataset.used="1";$("s2btn").setAttribute("aria-pressed",on);$("s2btn").textContent=on?"Season 2 hidden":"Season 2 shown"}
+$("prev").onclick=()=>go(idx-1,true); $("next").onclick=()=>go(idx+1,true);
+$("tour").onclick=()=>setTour(!touring);
+$("reveal").onclick=()=>setHide(false);
+$("s2btn").onclick=()=>setHide(!document.body.classList.contains("s2hide"));
+$("go").onclick=()=>{ if($("s2chk").checked) setHide(true); $("intro").classList.add("gone"); started=true; $("next").focus({preventScroll:true}); };
+addEventListener("keydown",ev=>{
+  if(!started){ return; }
+  if(ev.target.tagName==="BUTTON"&&(ev.key===" "||ev.key==="Enter")) return;
+  if(["ArrowRight","ArrowDown","PageDown"," "].includes(ev.key)){ev.preventDefault();go(idx+1,true)}
+  else if(["ArrowLeft","ArrowUp","PageUp"].includes(ev.key)){ev.preventDefault();go(idx-1,true)}
+  else if(ev.key==="Home") go(0,true); else if(ev.key==="End") go(N-1,true);
+});
+let wheelAcc=0,wheelLock=0;
+addEventListener("wheel",ev=>{
+  if(!started) return;
+  const now=performance.now(); if(now<wheelLock) return;
+  wheelAcc+=ev.deltaY+ev.deltaX;
+  if(Math.abs(wheelAcc)>50){go(idx+(wheelAcc>0?1:-1),true);wheelAcc=0;wheelLock=now+520}
+},{passive:true});
+
+const look={yaw:0,pitch:0,drag:false,x:0,y:0};
+const cv=$("gl");
+cv.addEventListener("pointerdown",e=>{look.drag=true;look.x=e.clientX;look.y=e.clientY;cv.setPointerCapture(e.pointerId)});
+cv.addEventListener("pointermove",e=>{
+  if(!look.drag) return;
+  look.yaw=Math.max(-2.6,Math.min(2.6,look.yaw+(e.clientX-look.x)*.004));
+  look.pitch=Math.max(-.5,Math.min(.9,look.pitch+(e.clientY-look.y)*.003));
+  look.x=e.clientX;look.y=e.clientY;
+});
+const endDrag=()=>{look.drag=false};
+cv.addEventListener("pointerup",endDrag);cv.addEventListener("pointercancel",endDrag);
+render();
+
+/* ---------- 3D ---------- */
+(function(){
+if(!window.THREE) return;
+let renderer;
+try{renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,powerPreference:"high-performance"})}catch(err){return}
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+const scene=new THREE.Scene();
+const fogCol=new THREE.Color(ERAS[0].fog);
+scene.background=fogCol.clone(); scene.fog=new THREE.FogExp2(fogCol.getHex(),.0085);
+const camera=new THREE.PerspectiveCamera(60,1,.5,1600);
+
+// seeded random so the city is the same every visit
+let seed=2077; const R=()=>{seed=(seed*1664525+1013904223)%4294967296;return seed/4294967296};
+const rr=(a,b)=>a+R()*(b-a);
+const ADD=THREE.AdditiveBlending;
+const V3=THREE.Vector3;
+
+/* path */
+const SEG=72, M=N+2, ctrl=[];
+for(let k=0;k<M;k++){const i=k-1;ctrl.push(new V3(Math.sin(i*.85)*34+Math.sin(i*.37)*18,0,-i*SEG))}
+const curve=new THREE.CatmullRomCurve3(ctrl,false,"catmullrom",.5);
+const tOf=q=>Math.max(0,Math.min(1,(q+1)/(M-1)));
+const SAMP=1400, samples=[], normals=[];
+for(let s=0;s<=SAMP;s++){const t=s/SAMP,pt=curve.getPoint(t),tg=curve.getTangent(t);samples.push(pt);normals.push(new V3(-tg.z,0,tg.x).normalize())}
+const stationOfT=t=>Math.max(0,Math.min(N-1,Math.round(t*(M-1)-1)));
+const eraCol=CH.map(c=>new THREE.Color(eraOf(c.e).c));
+const eraFog=CH.map(c=>new THREE.Color(eraOf(c.e).fog));
+
+function ribbon(a,b,y,colored,opacity){
+  const pos=[],col=[],ix=[];
+  for(let s=0;s<=SAMP;s++){
+    const pt=samples[s],n=normals[s];
+    pos.push(pt.x+n.x*a,y,pt.z+n.z*a, pt.x+n.x*b,y,pt.z+n.z*b);
+    const c=colored?eraCol[stationOfT(s/SAMP)]:null;
+    if(c){col.push(c.r,c.g,c.b,c.r,c.g,c.b)}
+    if(s<SAMP){const i=s*2;ix.push(i,i+1,i+2,i+1,i+3,i+2)}
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
+  if(colored) g.setAttribute("color",new THREE.Float32BufferAttribute(col,3));
+  g.setIndex(ix);
+  const m=new THREE.MeshBasicMaterial({color:colored?0xffffff:0x0b0d14,vertexColors:colored,side:THREE.DoubleSide,transparent:opacity<1,opacity});
+  const mesh=new THREE.Mesh(g,m); mesh.frustumCulled=false; scene.add(mesh); return mesh;
+}
+ribbon(-5.5,5.5,.04,false,1);
+ribbon(-5.9,-5.5,.08,true,1); ribbon(5.5,5.9,.08,true,1);
+ribbon(-.12,.12,.07,true,.35);
+
+/* ground */
+const zMin=-(N+1)*SEG, zLen=(N+3)*SEG;
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(900,zLen+400),new THREE.MeshBasicMaterial({color:0x04050a}));
+ground.rotation.x=-Math.PI/2; ground.position.set(0,-.02,zMin/2+SEG); scene.add(ground);
+const grid=new THREE.GridHelper(zLen+400,Math.round((zLen+400)/13),0x1b2333,0x10151f);
+grid.position.set(0,0,zMin/2+SEG); grid.material.transparent=true; grid.material.opacity=.55; scene.add(grid);
+
+/* buildings */
+function winTex(){
+  const c=document.createElement("canvas");c.width=64;c.height=128;const x=c.getContext("2d");
+  x.fillStyle="#090b11";x.fillRect(0,0,64,128);
+  for(let r=0;r<16;r++){const rowLit=R()<.8;for(let q=0;q<8;q++){
+    if(rowLit&&R()<.38){const v=140+R()*115|0;x.fillStyle=`rgba(${v},${v},${v},${.55+R()*.45})`;x.fillRect(q*8+2,r*8+2,4,5)}
+    else if(R()<.25){x.fillStyle="#141925";x.fillRect(q*8+2,r*8+2,4,5)}
+  }}
+  return c;
+}
+const baseWin=winTex();
+function distToPath(x,z){let best=1e9;for(let s=0;s<=SAMP;s+=4){const d=(samples[s].x-x)**2+(samples[s].z-z)**2;if(d<best)best=d}return Math.sqrt(best)}
+function pathX(z){const t=tOf(-z/SEG);return curve.getPoint(t).x}
+const classes=[{w:14,h:20,ry:1},{w:15,h:46,ry:2.3},{w:17,h:96,ry:4.8}];
+const lots=[];
+for(let gz=SEG*1.2;gz>zMin-SEG*.4;gz-=25){for(let gx=-170;gx<=170;gx+=25){
+  const x=gx+rr(-5,5), z=gz+rr(-5,5), d=distToPath(x,z);
+  if(d<21) continue;
+  if(R()<.1) continue;
+  const far=Math.min(1,(d-21)/90), q=R()+far*.25;
+  lots.push({x,z,cls:q>.93?2:q>.5?1:0,d});
+}}
+const dummy=new THREE.Object3D(), tmpC=new THREE.Color(), white=new THREE.Color(0xffffff);
+const signSpots=[];
+classes.forEach((cl,ci)=>{
+  const mine=lots.filter(l=>l.cls===ci); if(!mine.length) return;
+  const geo=new THREE.BoxGeometry(cl.w,cl.h,cl.w);
+  const uv=geo.attributes.uv; for(let i=8;i<16;i++) uv.setXY(i,.005,.005);
+  const tex=new THREE.CanvasTexture(baseWin); tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(2,cl.ry*1.6); tex.anisotropy=4;
+  const mesh=new THREE.InstancedMesh(geo,new THREE.MeshBasicMaterial({map:tex}),mine.length);
+  mine.forEach((l,i)=>{
+    const sx=rr(.7,1.25),sz=rr(.7,1.25),sy=rr(.7,1.3);
+    dummy.position.set(l.x,cl.h*sy/2,l.z); dummy.scale.set(sx,sy,sz); dummy.rotation.y=0; dummy.updateMatrix();
+    mesh.setMatrixAt(i,dummy.matrix);
+    const st=Math.max(0,Math.min(N-1,Math.round(-l.z/SEG)));
+    tmpC.copy(white).lerp(eraCol[st],rr(.45,.8)).multiplyScalar(rr(.55,1));
+    mesh.setColorAt(i,tmpC);
+    if(l.d<70&&R()<.42) signSpots.push({x:l.x,z:l.z,w:cl.w*sx,h:cl.h*sy,d:cl.w*sz,st});
+  });
+  mesh.instanceMatrix.needsUpdate=true; if(mesh.instanceColor) mesh.instanceColor.needsUpdate=true;
+  mesh.frustumCulled=false; scene.add(mesh);
+});
+
+/* neon signs: invented glyphs only */
+function glyphTex(kind){
+  const c=document.createElement("canvas");c.width=64;c.height=256;const x=c.getContext("2d");
+  x.strokeStyle="#fff";x.fillStyle="#fff";x.lineWidth=4;x.lineCap="square";
+  x.strokeRect(3,3,58,250);
+  const rows=kind%2?4:6, ch=230/rows;
+  for(let r=0;r<rows;r++){
+    const oy=14+r*ch, s=ch-12;
+    if(kind===4){x.fillRect(12,oy+s*.3,40*R()+8,s*.35);continue}
+    const strokes=3+(R()*4|0);
+    for(let k=0;k<strokes;k++){
+      const ax=14+(R()*4|0)*12, ay=oy+(R()*4|0)*s/3.4, hz=R()<.5, len=(1+(R()*3|0))*12;
+      x.beginPath();x.moveTo(ax,ay);x.lineTo(hz?Math.min(50,ax+len):ax,hz?ay:Math.min(oy+s,ay+len));x.stroke();
+    }
+  }
+  const t=new THREE.CanvasTexture(c);return t;
+}
+const glyphs=[0,1,2,3,4].map(glyphTex);
+const accents=[0xff2e88,0x19e6ff,0xd7ff3a,0xff7a2b,0xb98cff,0xffffff];
+const signs=[];
+signSpots.forEach(s=>{
+  const dir=pathX(s.z)>s.x?1:-1, h=Math.min(s.h*.6,rr(9,22)), w=h*.25;
+  const col=R()<.6?eraCol[s.st].getHex():accents[R()*accents.length|0];
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:glyphs[R()*5|0],color:col,transparent:true,blending:ADD,depthWrite:false,side:THREE.DoubleSide}));
+  m.position.set(s.x+dir*(s.w/2+.6),Math.min(s.h-h/2-1,rr(h/2+4,s.h*.8)),s.z+rr(-s.d*.3,s.d*.3));
+  m.rotation.y=dir*Math.PI/2; m.userData.f=R()<.18?rr(3,11):0; m.userData.ph=R()*9;
+  scene.add(m); signs.push(m);
+});
+
+/* glow sprite */
+const glowTex=(()=>{const c=document.createElement("canvas");c.width=c.height=128;const x=c.getContext("2d");
+  const g=x.createRadialGradient(64,64,0,64,64,64);g.addColorStop(0,"rgba(255,255,255,1)");g.addColorStop(.25,"rgba(255,255,255,.35)");g.addColorStop(1,"rgba(255,255,255,0)");
+  x.fillStyle=g;x.fillRect(0,0,128,128);return new THREE.CanvasTexture(c)})();
+function glow(color,size,op){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color,transparent:true,opacity:op,blending:ADD,depthWrite:false}));s.scale.set(size,size,1);return s}
+
+/* moon */
+const moon=new THREE.Mesh(new THREE.SphereGeometry(46,32,20),new THREE.MeshBasicMaterial({color:0xdfe6f2,fog:false}));
+const moonGlow=glow(0xbfd0ff,300,.35); moonGlow.material.fog=false;
+scene.add(moon,moonGlow);
+
+/* station symbols: abstract shapes, no characters or logos */
+const W=(g,c,op=1)=>new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:c,wireframe:true,transparent:true,opacity:op}));
+const S=(g,c,op=.35)=>new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:op,blending:ADD,depthWrite:false,side:THREE.DoubleSide}));
+const at=(m,x,y,z)=>{m.position.set(x,y,z);return m};
+const Box=THREE.BoxGeometry,Sph=THREE.SphereGeometry,Cyl=THREE.CylinderGeometry,Tor=THREE.TorusGeometry,Oct=THREE.OctahedronGeometry,Ico=THREE.IcosahedronGeometry;
+const BUILD={
+ tower(g,c){g.add(at(W(new Box(2.2,6,2.2,1,5,1),c),0,-1.5,0));const t=at(W(new Box(2.2,3,2.2,1,2,1),c),1.1,2.6,0);t.rotation.z=-.55;g.add(t);g.add(at(S(new Sph(.9,16,10),0xffffff,.3),.3,1.4,0))},
+ blocks(g,c){for(let i=0;i<6;i++){const w=3.4-i*.35;g.add(at(i%2?S(new Box(w,1,w),c,.3):W(new Box(w,1,w),c),(i%2?.3:-.3),-3+i*1.15,0))}},
+ spine(g,c){for(let i=0;i<8;i++){const y=-3.4+i*.95,b=at(S(new Box(1.5-Math.abs(i-3.5)*.08,.6,1),c,.5),Math.sin(i*.5)*.5,y,0);g.add(b);g.add(at(W(new Box(2.6,.12,.3),c),Math.sin(i*.5)*.5,y,0))}},
+ moon(g,c){g.add(W(new Sph(2.6,14,10),0xe8eefc,.8));const o=W(new Tor(4,.03,4,64),c);o.rotation.x=1.2;g.add(o);g.add(at(S(new Sph(.35,8,8),c,1),3.9,.9,0))},
+ shatter(g,c){for(let i=0;i<14;i++){const m=S(new THREE.TetrahedronGeometry(rr(.5,1.1)),i%3?c:0xffffff,.5);const v=new V3(rr(-1,1),rr(-1,1),rr(-1,1)).normalize().multiplyScalar(rr(1.2,3.6));m.position.copy(v);m.rotation.set(R()*6,R()*6,R()*6);g.add(m)}g.add(W(new Ico(1,0),c))},
+ knot(g,c){g.add(W(new THREE.TorusKnotGeometry(2,.55,90,8,2,3),c,.9));g.add(S(new Sph(.9,10,8),0xffffff,.5))},
+ frame(g,c){g.add(W(new Oct(3.2,0),c));const a=W(new Oct(3.2,0),0xffffff,.5);a.scale.set(.55,1.5,.55);g.add(a);for(let i=-1;i<=1;i++){const r=W(new Tor(2.2-Math.abs(i)*.6,.04,4,40),c);r.rotation.x=Math.PI/2;r.position.y=i*1.6;g.add(r)}},
+ tri(g,c){for(let i=0;i<3;i++){const a=i*2.094,m=at(S(new Cyl(.12,.5,7,6),i===1?0xffffff:c,.6),Math.cos(a)*2.2,-.5,Math.sin(a)*2.2);m.rotation.z=Math.cos(a)*.3;m.rotation.x=-Math.sin(a)*.3;g.add(m)}g.add(at(W(new Oct(.9,0),c),0,3.4,0))},
+ chip(g,c){const b=S(new Box(3,4.4,.3),c,.4);g.add(b);g.add(W(new Box(3,4.4,.3,3,4,1),c));for(let i=0;i<5;i++)g.add(at(S(new Box(.3,.9,.12),0xffffff,.8),-1.2+i*.6,-2.6,0));g.add(at(S(new Box(1.2,1.2,.36),0xffffff,.5),0,.6,0))},
+ ghost(g,c){g.add(at(W(new Sph(2,12,9),c),-.9,0,0));g.add(at(W(new Sph(2,12,9),0xff3d6e,.8),.9,.2,0));g.add(S(new Sph(.9,10,8),0xffffff,.45))},
+ compass(g,c){[[0,2.6],[2.6,0],[0,-2.6],[-2.6,0]].forEach(([x,y],i)=>{const m=at(i%2?W(new Oct(1,0),c):S(new Oct(1,0),c,.55),x,y,0);g.add(m)});const r=W(new Tor(2.6,.03,4,48),0xffffff,.5);g.add(r);g.add(S(new Sph(.4,8,8),0xffffff,.9))},
+ dome(g,c){g.add(at(W(new Sph(3.2,16,8,0,Math.PI*2,0,Math.PI/2),c),0,-2,0));const st=at(S(new Cyl(.02,.28,7,6),0xffffff,.8),2.6,2.4,0);st.rotation.z=.9;g.add(st);const r=at(W(new Tor(3.2,.05,4,48),c),0,-2,0);r.rotation.x=Math.PI/2;g.add(r)},
+ fork(g,c){g.add(at(S(new Cyl(.22,.22,3.6,6),0xffffff,.6),0,-2,0));[-1,1].forEach(s=>{const m=at(S(new Cyl(.2,.2,4.4,6),s<0?c:0x19e6ff,.65),s*1.5,1.6,0);m.rotation.z=-s*.75;g.add(m);g.add(at(W(new Oct(.6,0),s<0?c:0x19e6ff),s*3.2,3.4,0))})},
+ roof(g,c){g.add(at(W(new Box(6,.4,4,4,1,3),c),0,-2.6,0));g.add(at(S(new Cyl(.05,.05,5.5,4),0xffffff,.8),-2,.2,-1));g.add(at(S(new Sph(.3,8,8),0xff3d6e,1),-2,3,-1));g.add(at(S(new Box(.5,1.4,.5),c,.6),1,-1.7,.6));g.add(at(S(new Box(.5,1.4,.5),0xff3d6e,.5),1.9,-1.7,.6))},
+ cards(g,c){const cols=[0xd7ff3a,0x19e6ff,0xff3d6e,0xffffff,0xff7a2b];for(let i=0;i<5;i++){const a=(i-2)*.36,grp=new THREE.Group();grp.add(S(new THREE.PlaneGeometry(1.7,2.9),cols[i],.3));grp.add(W(new THREE.PlaneGeometry(1.7,2.9,2,3),cols[i]));grp.position.set(Math.sin(a)*3.4,Math.cos(a)*3.4-2.6,i*.05);grp.rotation.z=-a;g.add(grp)}},
+ lens(g,c){const t=W(new Tor(2.4,.5,8,28),c);g.add(t);for(let i=0;i<6;i++){const b=S(new THREE.PlaneGeometry(2.2,.9),i%2?c:0xffffff,.35);b.rotation.z=i*1.047+.5;b.position.set(Math.cos(i*1.047)*1,Math.sin(i*1.047)*1,0);g.add(b)}g.add(S(new Sph(.5,8,8),0xffffff,.8))},
+ crown(g,c){const r=W(new Cyl(2.4,2.4,1.1,10,1,true),c);g.add(at(r,0,-.6,0));for(let i=0;i<5;i++){const a=i*1.2566,sp=at(S(new THREE.ConeGeometry(.45,i===2?1:2.2,4),i===2?0x555a66:c,.6),Math.cos(a)*2.4,i===2?.4:1,Math.sin(a)*2.4);g.add(sp)}},
+ twin(g,c){g.add(at(W(new Sph(2.4,14,10,0,Math.PI),c),-.5,0,0));g.add(at(W(new Sph(2.4,14,10,Math.PI,Math.PI),0x19e6ff),.5,0,0));g.add(S(new Sph(.5,8,8),0xffffff,.9))},
+ helix(g,c){for(let i=0;i<22;i++){const a=i*.55,y=-3.6+i*.34;g.add(at(S(new Sph(.24,6,6),c,.9),Math.cos(a)*1.6,y,Math.sin(a)*1.6));g.add(at(S(new Sph(.24,6,6),i>12?0x8a93a3:0xffffff,.8),-Math.cos(a)*1.6,y,-Math.sin(a)*1.6));if(i%2===0&&i<13){const b=at(S(new Cyl(.04,.04,3.2,4),c,.5),0,y,0);b.rotation.z=Math.PI/2;b.rotation.y=-a;g.add(b)}}},
+ burst(g,c){for(let i=0;i<4;i++){const r=W(new Tor(1+i*1.05,.04,4,56),i%2?0xffffff:c,1-i*.2);r.rotation.x=Math.PI/2;r.userData.ring=i;g.add(r)}g.add(S(new Sph(.8,10,8),0xffffff,.8))},
+ star(g,c){g.add(S(new Oct(1.3,0),0xffffff,.9));g.add(W(new Oct(2.2,0),c));for(let i=0;i<8;i++){const m=S(new Cyl(.01,.09,5,4),i%2?c:0xffffff,.6),a=i*.785;m.position.set(Math.cos(a)*2.9,Math.sin(a)*2.9,0);m.rotation.z=a-Math.PI/2;g.add(m)}}
+};
+function labelSprite(txt,color){
+  const c=document.createElement("canvas");c.width=512;c.height=96;const x=c.getContext("2d");
+  x.font="700 44px ui-monospace,Menlo,Consolas,monospace";x.textAlign="center";x.textBaseline="middle";x.fillStyle=color;x.fillText(txt,256,50);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false}));s.scale.set(11,2.06,1);return s;
+}
+const stations=[], stPos=[];
+CH.forEach((c,i)=>{
+  const t=tOf(i), pt=curve.getPoint(t), tg=curve.getTangent(t), n=new V3(-tg.z,0,tg.x).normalize(), side=i%2?1:-1;
+  const base=pt.clone().addScaledVector(n,side*7.5);
+  const col=eraCol[i].getHex(), g=new THREE.Group(), sym=new THREE.Group();
+  (BUILD[c.k]||BUILD.star)(sym,col); sym.children=sym.children.filter(Boolean);
+  sym.position.y=7.2; g.add(sym);
+  const beam=S(new Cyl(.45,.45,400,10,1,true),col,.12); beam.position.y=200; g.add(beam);
+  const ring=S(new THREE.RingGeometry(3.4,3.8,48),col,.7); ring.rotation.x=-Math.PI/2; ring.position.y=.12; g.add(ring);
+  const disc=S(new THREE.CircleGeometry(3.4,40),col,.1); disc.rotation.x=-Math.PI/2; disc.position.y=.1; g.add(disc);
+  const halo=glow(col,26,.3); halo.position.y=7.2; g.add(halo);
+  const lab=labelSprite(String(i+1).padStart(2,"0")+" · "+c.y,eraOf(c.e).c); lab.position.y=13.6; g.add(lab);
+  g.position.copy(base); scene.add(g);
+  stations.push({g,sym,beam,halo,ring,k:c.k}); stPos.push(base.clone().setY(7.6));
+});
+
+/* traffic in the sky */
+const cars=[]; const carGeo=new Box(2.6,.35,.9);
+for(let i=0;i<46;i++){
+  const m=new THREE.Mesh(carGeo,new THREE.MeshBasicMaterial({color:R()<.5?0xff3d4a:0xfff3c4}));
+  const alongZ=R()<.6; m.userData={alongZ,sp:rr(18,46)*(R()<.5?1:-1),off:rr(-150,150),y:rr(24,80),ph:R()*600};
+  if(alongZ) m.rotation.y=Math.PI/2; scene.add(m); cars.push(m);
+}
+
+/* rain */
+const RN=reduce?0:1300, rainPos=new Float32Array(RN*6), rainL=[];
+for(let i=0;i<RN;i++) rainL.push([rr(-70,70),rr(0,70),rr(-70,70),rr(55,95)]);
+const rainGeo=new THREE.BufferGeometry(); rainGeo.setAttribute("position",new THREE.BufferAttribute(rainPos,3));
+const rain=new THREE.LineSegments(rainGeo,new THREE.LineBasicMaterial({color:0x9fb4d8,transparent:true,opacity:.28}));
+rain.frustumCulled=false; scene.add(rain);
+
+/* sizing */
+function resize(){
+  const w=innerWidth,h=innerHeight; renderer.setSize(w,h,false);
+  camera.aspect=w/h; camera.fov=w<h?74:60;
+  if(w>820) camera.setViewOffset(w,h,-w*.13,h*.03,w,h); else camera.setViewOffset(w,h,0,h*.17,w,h);
+  camera.updateProjectionMatrix();
+}
+addEventListener("resize",resize); resize();
+
+/* loop */
+const camPos=new V3(), lookAt=new V3(), UP=new V3(0,1,0);
+const clock=new THREE.Clock(); let time=0;
+function frame(){
+  requestAnimationFrame(frame);
+  if(document.hidden) return;
+  const dt=Math.min(clock.getDelta(),.05); time+=dt;
+  if(touring&&started&&!openWho){tourT+=dt;if(tourT>11){tourT=0;if(idx<N-1){idx++;seen.add(idx);render()}else setTour(false)}}
+  p+=(idx-p)*(1-Math.exp(-dt*2.1)); if(Math.abs(idx-p)<.0004) p=idx;
+  if(!look.drag&&!started){look.yaw=Math.sin(time*.2)*.25}
+
+  // camera rides the road a little behind the current stop
+  camPos.copy(curve.getPoint(tOf(p-.4))); camPos.y=5.6+Math.sin(time*.7)*.15+Math.abs(idx-p)*2.5;
+  const a=Math.max(0,Math.min(N-1,Math.floor(p))), b=Math.min(N-1,a+1), f=p-a, sf=f*f*(3-2*f);
+  lookAt.copy(stPos[a]).lerp(stPos[b],sf);
+  camera.position.copy(camPos); camera.lookAt(lookAt);
+  camera.rotateOnWorldAxis(UP,-look.yaw); camera.rotateX(-look.pitch);
+
+  // atmosphere follows the era
+  fogCol.copy(eraFog[a]).lerp(eraFog[b],sf); scene.fog.color.copy(fogCol); scene.background.copy(fogCol);
+  moon.position.set(camPos.x-330,250,camPos.z-820); moonGlow.position.copy(moon.position);
+
+  stations.forEach((s,i)=>{
+    const near=Math.max(0,1-Math.abs(i-p));
+    s.sym.rotation.y+=dt*(.35+near*.5);
+    s.sym.position.y=7.2+Math.sin(time*1.3+i)*.35;
+    s.sym.scale.setScalar(1+near*.3);
+    s.beam.material.opacity=.07+near*.3; s.halo.material.opacity=.18+near*.4;
+    s.ring.scale.setScalar(1+Math.sin(time*2+i)*.04*near);
+    if(s.k==="burst") s.sym.children.forEach(ch=>{if(ch.userData.ring!==undefined){const q=((time*.5+ch.userData.ring*.25)%1);ch.scale.setScalar(.4+q*1.6);ch.material.opacity=1-q}});
+    s.g.visible=Math.abs(i-p)<5;
+  });
+  signs.forEach(m=>{if(m.userData.f) m.material.opacity=Math.sin(time*m.userData.f+m.userData.ph)>-.6?1:.15});
+  cars.forEach(m=>{const u=m.userData,span=600,q=((time*u.sp+u.ph)%span+span)%span-span/2;
+    if(u.alongZ) m.position.set(u.off,u.y,camPos.z-120+q); else m.position.set(camPos.x+q,u.y,camPos.z-120+u.off*1.6)});
+  for(let i=0;i<RN;i++){const r=rainL[i];r[1]-=r[3]*dt;if(r[1]<0)r[1]+=70;
+    const x=camPos.x+r[0],z=camPos.z+r[2]-20,j=i*6;
+    rainPos[j]=x;rainPos[j+1]=r[1];rainPos[j+2]=z;rainPos[j+3]=x+.25;rainPos[j+4]=r[1]+1.5;rainPos[j+5]=z}
+  if(RN) rainGeo.attributes.position.needsUpdate=true;
+  renderer.render(scene,camera);
+}
+frame();
+})();
+</script>
+</body>
+</html>
